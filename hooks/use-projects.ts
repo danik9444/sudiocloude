@@ -27,23 +27,27 @@ export function useProjects() {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) throw new Error('User not authenticated')
 
-      // Get user's studio
-      const { data: studio, error: studioError } = await supabase
-        .from('studios')
-        .select('id')
-        .eq('owner_id', user.id)
+      // Get user's studio through user_profiles
+      const { data: profile, error: profileError } = await supabase
+        .from('user_profiles')
+        .select('studio_id')
+        .eq('id', user.id)
         .single()
 
-      if (studioError || !studio) {
+      if (profileError || !profile?.studio_id) {
         throw new Error('Studio not found')
       }
+
+      // Generate folder path from project name and date
+      const folderPath = `${project.event_date}_${project.project_name.replace(/\s+/g, '_')}`
 
       // Insert project
       const { data, error } = await supabase
         .from('projects')
         .insert({
           ...project,
-          studio_id: studio.id,
+          studio_id: profile.studio_id,
+          folder_path: folderPath,
           total_size: 0,
           file_count: 0,
           event_type: 'wedding' // default value

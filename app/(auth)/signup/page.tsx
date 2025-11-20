@@ -32,24 +32,42 @@ export default function SignupPage() {
 
       if (authError) throw authError
 
-      // If signup was successful and we have a user, create their studio
+      // If signup was successful and we have a user, create their studio and profile
       if (authData.user) {
-        const { error: studioError } = await supabase
+        // 1. Create studio
+        const { data: newStudio, error: studioError } = await supabase
           .from('studios')
           .insert({
-            owner_id: authData.user.id,
-            studio_name: 'הסטודיו שלי',
+            name: 'הסטודיו שלי',
             email: email,
             phone: '',
-            address: '',
-            total_storage_used: 0,
-            total_projects: 0,
-            subscription_tier: 'free',
-            subscription_status: 'active'
+            whatsapp_number: '972500000000', // Placeholder, can be updated in settings
+            plan_tier: 'free',
+            is_active: true
           })
+          .select()
+          .single()
 
         if (studioError) {
           console.error('Error creating studio:', studioError)
+          throw studioError
+        }
+
+        // 2. Create user profile linked to studio
+        if (newStudio) {
+          const { error: profileError } = await supabase
+            .from('user_profiles')
+            .insert({
+              id: authData.user.id,
+              studio_id: newStudio.id,
+              role: 'owner',
+              full_name: email.split('@')[0] // Use email username as initial name
+            })
+
+          if (profileError) {
+            console.error('Error creating profile:', profileError)
+            // Don't throw - studio was created successfully
+          }
         }
       }
 

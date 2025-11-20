@@ -35,7 +35,7 @@ export default async function DashboardPage() {
     totalProjects: projects?.length || 0,
   }
 
-  const studioName = (profile as any)?.studio?.studio_name || 'משתמש'
+  const studioName = (profile as any)?.studio?.name || 'משתמש'
 
   return (
     <div className="space-y-8">

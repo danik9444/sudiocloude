@@ -5,20 +5,20 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Textarea } from '@/components/ui/textarea'
 import { useToast } from '@/components/ui/use-toast'
 import { createClient } from '@/lib/supabase/client'
-import { Building2, Mail, Phone, MapPin, Save, Loader2, LogOut } from 'lucide-react'
+import { Building2, Mail, Phone, MessageSquare, Save, Loader2, LogOut } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 
 export default function SettingsPage() {
   const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
+  const [studioId, setStudioId] = useState<string | null>(null)
   const [formData, setFormData] = useState({
-    studio_name: '',
+    name: '',
     email: '',
     phone: '',
-    address: ''
+    whatsapp_number: ''
   })
   const { toast } = useToast()
   const supabase = createClient()
@@ -34,21 +34,35 @@ export default function SettingsPage() {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) return
 
-      const { data: studio, error } = await supabase
-        .from('studios')
-        .select('studio_name, email, phone, address')
-        .eq('owner_id', user.id)
+      // Get user's studio through user_profiles
+      const { data: profile, error: profileError } = await supabase
+        .from('user_profiles')
+        .select('studio_id')
+        .eq('id', user.id)
         .single()
 
-      if (error) throw error
+      if (profileError) throw profileError
 
-      if (studio) {
-        setFormData({
-          studio_name: studio.studio_name || '',
-          email: studio.email || '',
-          phone: studio.phone || '',
-          address: studio.address || ''
-        })
+      if (profile?.studio_id) {
+        setStudioId(profile.studio_id)
+
+        // Get studio data
+        const { data: studio, error: studioError } = await supabase
+          .from('studios')
+          .select('name, email, phone, whatsapp_number')
+          .eq('id', profile.studio_id)
+          .single()
+
+        if (studioError) throw studioError
+
+        if (studio) {
+          setFormData({
+            name: studio.name || '',
+            email: studio.email || '',
+            phone: studio.phone || '',
+            whatsapp_number: studio.whatsapp_number || ''
+          })
+        }
       }
     } catch (error) {
       console.error('Error loading studio data:', error)
@@ -63,20 +77,26 @@ export default function SettingsPage() {
   }
 
   const handleSave = async () => {
+    if (!studioId) {
+      toast({
+        title: 'שגיאה',
+        description: 'לא נמצא סטודיו',
+        variant: 'destructive'
+      })
+      return
+    }
+
     setSaving(true)
     try {
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) throw new Error('User not authenticated')
-
       const { error } = await supabase
         .from('studios')
         .update({
-          studio_name: formData.studio_name,
+          name: formData.name,
           email: formData.email,
           phone: formData.phone,
-          address: formData.address
+          whatsapp_number: formData.whatsapp_number
         })
-        .eq('owner_id', user.id)
+        .eq('id', studioId)
 
       if (error) throw error
 
@@ -85,6 +105,7 @@ export default function SettingsPage() {
         description: 'הפרטים עודכנו במערכת',
       })
     } catch (error) {
+      console.error('Save error:', error)
       toast({
         title: 'שגיאה',
         description: 'לא הצלחנו לשמור את השינויים',
@@ -136,15 +157,15 @@ export default function SettingsPage() {
         </CardHeader>
         <CardContent className="space-y-6">
           <div className="space-y-2">
-            <Label htmlFor="studio_name" className="flex items-center gap-2">
+            <Label htmlFor="name" className="flex items-center gap-2">
               <Building2 className="h-4 w-4 text-muted-foreground" />
               שם הסטודיו
             </Label>
             <Input
-              id="studio_name"
+              id="name"
               placeholder="סטודיו הצילום שלי"
-              value={formData.studio_name}
-              onChange={(e) => setFormData({ ...formData, studio_name: e.target.value })}
+              value={formData.name}
+              onChange={(e) => setFormData({ ...formData, name: e.target.value })}
             />
           </div>
 
@@ -177,17 +198,20 @@ export default function SettingsPage() {
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="address" className="flex items-center gap-2">
-              <MapPin className="h-4 w-4 text-muted-foreground" />
-              כתובת
+            <Label htmlFor="whatsapp" className="flex items-center gap-2">
+              <MessageSquare className="h-4 w-4 text-muted-foreground" />
+              מספר WhatsApp
             </Label>
-            <Textarea
-              id="address"
-              placeholder="רחוב, עיר, מיקוד"
-              rows={3}
-              value={formData.address}
-              onChange={(e) => setFormData({ ...formData, address: e.target.value })}
+            <Input
+              id="whatsapp"
+              type="tel"
+              placeholder="972501234567"
+              value={formData.whatsapp_number}
+              onChange={(e) => setFormData({ ...formData, whatsapp_number: e.target.value })}
             />
+            <p className="text-xs text-muted-foreground">
+              פורמט: 972501234567 (קוד מדינה + מספר ללא אפס)
+            </p>
           </div>
 
           <div className="flex gap-3 pt-4">
