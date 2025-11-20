@@ -23,9 +23,33 @@ export function useProjects() {
 
   const createProject = useMutation({
     mutationFn: async (project: ProjectInsert) => {
-      const { data, error } = await supabase.functions.invoke('create-project', {
-        body: project,
-      })
+      // Get current user
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) throw new Error('User not authenticated')
+
+      // Get user's studio
+      const { data: studio, error: studioError } = await supabase
+        .from('studios')
+        .select('id')
+        .eq('owner_id', user.id)
+        .single()
+
+      if (studioError || !studio) {
+        throw new Error('Studio not found')
+      }
+
+      // Insert project
+      const { data, error } = await supabase
+        .from('projects')
+        .insert({
+          ...project,
+          studio_id: studio.id,
+          total_size: 0,
+          file_count: 0,
+          event_type: 'wedding' // default value
+        })
+        .select()
+        .single()
 
       if (error) throw error
       return data
