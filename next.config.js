@@ -2,12 +2,6 @@
 const nextConfig = {
   reactStrictMode: true,
 
-  // RTL Support
-  i18n: {
-    locales: ['he', 'en'],
-    defaultLocale: 'he',
-  },
-
   // Image optimization
   images: {
     remotePatterns: [
