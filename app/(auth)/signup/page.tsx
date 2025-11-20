@@ -24,19 +24,45 @@ export default function SignupPage() {
     setLoading(true)
 
     try {
-      const { error } = await supabase.auth.signUp({
+      // Sign up the user
+      const { data: authData, error: authError } = await supabase.auth.signUp({
         email,
         password,
       })
 
-      if (error) throw error
+      if (authError) throw authError
+
+      // If signup was successful and we have a user, create their studio
+      if (authData.user) {
+        const { error: studioError } = await supabase
+          .from('studios')
+          .insert({
+            owner_id: authData.user.id,
+            studio_name: 'הסטודיו שלי',
+            email: email,
+            phone: '',
+            address: '',
+            total_storage_used: 0,
+            total_projects: 0,
+            subscription_tier: 'free',
+            subscription_status: 'active'
+          })
+
+        if (studioError) {
+          console.error('Error creating studio:', studioError)
+        }
+      }
 
       toast({
         title: 'ברוך הבא! 🎉',
-        description: 'החשבון נוצר בהצלחה. אנא התחבר כעת.',
+        description: 'החשבון נוצר בהצלחה. מעביר לדשבורד...',
       })
 
-      router.push('/login')
+      // Redirect to dashboard instead of login
+      setTimeout(() => {
+        router.push('/dashboard')
+        router.refresh()
+      }, 1000)
     } catch (error) {
       toast({
         title: 'שגיאה ביצירת חשבון',

@@ -15,17 +15,74 @@ import { format } from 'date-fns'
 import { he } from 'date-fns/locale'
 import { useState } from 'react'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
+import { useToast } from '@/components/ui/use-toast'
 
 export default function ProjectsPage() {
-  const { projects, isLoading } = useProjects()
+  const { projects, isLoading, createProject, isCreating } = useProjects()
+  const { toast } = useToast()
   const [searchQuery, setSearchQuery] = useState('')
   const [statusFilter, setStatusFilter] = useState<string>('all')
+  const [isDialogOpen, setIsDialogOpen] = useState(false)
+
+  // Form state
+  const [formData, setFormData] = useState({
+    project_name: '',
+    event_date: '',
+    status: 'upcoming',
+    notes: ''
+  })
 
   const filteredProjects = projects?.filter((project) => {
     const matchesSearch = project.project_name.toLowerCase().includes(searchQuery.toLowerCase())
     const matchesStatus = statusFilter === 'all' || project.status === statusFilter
     return matchesSearch && matchesStatus
   })
+
+  const handleCreateProject = async () => {
+    // Validation
+    if (!formData.project_name.trim()) {
+      toast({
+        title: 'שגיאה',
+        description: 'נא להזין שם פרויקט',
+        variant: 'destructive'
+      })
+      return
+    }
+
+    if (!formData.event_date) {
+      toast({
+        title: 'שגיאה',
+        description: 'נא לבחור תאריך אירוע',
+        variant: 'destructive'
+      })
+      return
+    }
+
+    try {
+      await createProject(formData)
+
+      toast({
+        title: 'הצלחה!',
+        description: 'הפרויקט נוצר בהצלחה',
+      })
+
+      // Reset form
+      setFormData({
+        project_name: '',
+        event_date: '',
+        status: 'upcoming',
+        notes: ''
+      })
+
+      setIsDialogOpen(false)
+    } catch (error) {
+      toast({
+        title: 'שגיאה',
+        description: 'אירעה שגיאה ביצירת הפרויקט',
+        variant: 'destructive'
+      })
+    }
+  }
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -73,7 +130,7 @@ export default function ProjectsPage() {
             נהל את כל הפרויקטים והאירועים במקום אחד
           </p>
         </div>
-        <Dialog>
+        <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
           <DialogTrigger asChild>
             <Button size="lg" className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 shadow-lg hover:shadow-xl transition-all">
               <Plus className="ml-2 h-5 w-5" />
@@ -90,15 +147,28 @@ export default function ProjectsPage() {
             <div className="space-y-4 py-4">
               <div className="space-y-2">
                 <Label htmlFor="name">שם הפרויקט</Label>
-                <Input id="name" placeholder="חתונת דני ורונית" />
+                <Input
+                  id="name"
+                  placeholder="חתונת דני ורונית"
+                  value={formData.project_name}
+                  onChange={(e) => setFormData({ ...formData, project_name: e.target.value })}
+                />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="date">תאריך האירוע</Label>
-                <Input id="date" type="date" />
+                <Input
+                  id="date"
+                  type="date"
+                  value={formData.event_date}
+                  onChange={(e) => setFormData({ ...formData, event_date: e.target.value })}
+                />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="status">סטטוס</Label>
-                <Select defaultValue="upcoming">
+                <Select
+                  value={formData.status}
+                  onValueChange={(value) => setFormData({ ...formData, status: value })}
+                >
                   <SelectTrigger>
                     <SelectValue />
                   </SelectTrigger>
@@ -112,15 +182,25 @@ export default function ProjectsPage() {
               </div>
               <div className="space-y-2">
                 <Label htmlFor="notes">הערות</Label>
-                <Textarea id="notes" placeholder="הערות נוספות על הפרויקט..." rows={3} />
+                <Textarea
+                  id="notes"
+                  placeholder="הערות נוספות על הפרויקט..."
+                  rows={3}
+                  value={formData.notes}
+                  onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
+                />
               </div>
             </div>
             <div className="flex justify-end gap-3">
-              <DialogTrigger asChild>
-                <Button variant="outline">ביטול</Button>
-              </DialogTrigger>
-              <Button className="bg-gradient-to-r from-blue-600 to-purple-600">
-                צור פרויקט
+              <Button variant="outline" onClick={() => setIsDialogOpen(false)}>
+                ביטול
+              </Button>
+              <Button
+                className="bg-gradient-to-r from-blue-600 to-purple-600"
+                onClick={handleCreateProject}
+                disabled={isCreating}
+              >
+                {isCreating ? 'יוצר...' : 'צור פרויקט'}
               </Button>
             </div>
           </DialogContent>
@@ -266,7 +346,7 @@ export default function ProjectsPage() {
             <p className="text-muted-foreground mb-6 max-w-md">
               צור את הפרויקט הראשון שלך והתחל לנהל את האירועים בצורה מקצועית
             </p>
-            <Dialog>
+            <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
               <DialogTrigger asChild>
                 <Button size="lg" className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 shadow-lg">
                   <Plus className="ml-2 h-5 w-5" />
@@ -282,16 +362,29 @@ export default function ProjectsPage() {
                 </DialogHeader>
                 <div className="space-y-4 py-4">
                   <div className="space-y-2">
-                    <Label htmlFor="name">שם הפרויקט</Label>
-                    <Input id="name" placeholder="חתונת דני ורונית" />
+                    <Label htmlFor="name2">שם הפרויקט</Label>
+                    <Input
+                      id="name2"
+                      placeholder="חתונת דני ורונית"
+                      value={formData.project_name}
+                      onChange={(e) => setFormData({ ...formData, project_name: e.target.value })}
+                    />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="date">תאריך האירוע</Label>
-                    <Input id="date" type="date" />
+                    <Label htmlFor="date2">תאריך האירוע</Label>
+                    <Input
+                      id="date2"
+                      type="date"
+                      value={formData.event_date}
+                      onChange={(e) => setFormData({ ...formData, event_date: e.target.value })}
+                    />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="status">סטטוס</Label>
-                    <Select defaultValue="upcoming">
+                    <Label htmlFor="status2">סטטוס</Label>
+                    <Select
+                      value={formData.status}
+                      onValueChange={(value) => setFormData({ ...formData, status: value })}
+                    >
                       <SelectTrigger>
                         <SelectValue />
                       </SelectTrigger>
@@ -304,16 +397,26 @@ export default function ProjectsPage() {
                     </Select>
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="notes">הערות</Label>
-                    <Textarea id="notes" placeholder="הערות נוספות על הפרויקט..." rows={3} />
+                    <Label htmlFor="notes2">הערות</Label>
+                    <Textarea
+                      id="notes2"
+                      placeholder="הערות נוספות על הפרויקט..."
+                      rows={3}
+                      value={formData.notes}
+                      onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
+                    />
                   </div>
                 </div>
                 <div className="flex justify-end gap-3">
-                  <DialogTrigger asChild>
-                    <Button variant="outline">ביטול</Button>
-                  </DialogTrigger>
-                  <Button className="bg-gradient-to-r from-blue-600 to-purple-600">
-                    צור פרויקט
+                  <Button variant="outline" onClick={() => setIsDialogOpen(false)}>
+                    ביטול
+                  </Button>
+                  <Button
+                    className="bg-gradient-to-r from-blue-600 to-purple-600"
+                    onClick={handleCreateProject}
+                    disabled={isCreating}
+                  >
+                    {isCreating ? 'יוצר...' : 'צור פרויקט'}
                   </Button>
                 </div>
               </DialogContent>
